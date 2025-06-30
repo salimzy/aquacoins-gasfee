@@ -1,12 +1,11 @@
 <template>
   <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-    <!-- Hero Section -->
     <HeroSection 
       v-if="!isConnected"
       @connect="$emit('connect')"
     />
     
-    <!-- Dashboard -->
+    <!-- Dashboard should only show when connected -->
     <Dashboard 
       v-else
       :active-tab="activeTab"
@@ -39,7 +38,12 @@ export default {
     Dashboard
   },
   props: {
-    // All props from parent
-  }
+   isConnected: {
+      type: Boolean,
+      required: true
+    },
+    walletAddress: String
+  },
+  emits: ['connect'] 
 };
 </script>

@@ -1,94 +1,292 @@
-<!-- <script setup lang="ts">
-import { RouterLink, RouterView } from 'vue-router'
-import HelloWorld from './components/HelloWorld.vue'
-import headerComponent from './components/partials/header.vue';
-</script> -->
-<!-- 
-<template>
- <header>
-    <img alt="Vue logo" class="logo" src="@/assets/logo.svg" width="125" height="125" />
-
-    <div class="wrapper">
-      <HelloWorld msg="You did it!" />
-
-      <nav>
-        <RouterLink to="/">Home</RouterLink>
-        <RouterLink to="/about">About</RouterLink>
-        <RouterLink to="/main">About</RouterLink>
-      </nav>
-    </div>
-   </header> 
-<headerComponent />
-  <RouterView />
+<!-- <template>
+  <div id="app">
+    <NavigationBar 
+      :is-connected="isConnected"
+      :wallet-address="walletAddress"
+      :selected-wallet="selectedWallet"
+      @connect="showWalletModal = true"
+      @disconnect="disconnect"
+    />
+    
+    <MainContent
+      :is-connected="isConnected"
+      :wallet-address="walletAddress"  
+      :active-tab="activeTab"
+      :ton-balance="tonBalance"
+      :aquacoin-balance="aquacoinBalance"
+      :ton-price="tonPrice"
+      :aquacoin-price="aquacoinPrice"
+      :total-portfolio-value="totalPortfolioValue"
+      :send-form="sendForm"
+      :swap-form="swapForm"
+      :transaction-history="transactionHistory"
+      :is-transaction-pending="isTransactionPending"
+      :is-swap-pending="isSwapPending"
+      @tab-change="activeTab = $event"
+      @send-transaction="sendTransaction"
+      @perform-swap="performSwap"
+      @swap-tokens="swapTokens"
+      @copy-address="copyAddress"
+     
+    />
+    
+    <WalletModal
+      v-if="showWalletModal"
+      :supported-wallets="supportedWallets"
+      @close="showWalletModal = false"
+      @connect="connectWallet"
+    />
+    
+    <ConfirmationModal
+      v-if="showConfirmationModal"
+      :confirmation-data="confirmationData"
+      @close="showConfirmationModal = false"
+      @confirm="confirmTransaction"
+    />
+    
+    <NotificationToast
+      v-if="notification.show"
+      :type="notification.type"
+      :message="notification.message"
+    />
+  </div>
 </template>
 
-<style scoped>
-header {
-  line-height: 1.5;
-  max-height: 100vh;
-}
+<script>
+import NavigationBar from './components/NavigationBar.vue';
+import MainContent from './components/MainContent.vue';
+import WalletModal from './components/WalletModal.vue';
+import ConfirmationModal from './components/ConfirmationModal.vue';
+import NotificationToast from './components/NotificationToast.vue';
 
-.logo {
-  display: block;
-  margin: 0 auto 2rem;
-}
+export default {
+  name: 'App',
+  components: {
+    NavigationBar,
+    MainContent,
+    WalletModal,
+    ConfirmationModal,
+    NotificationToast
+  },
+  data() {
+    return {
+      isConnected: false,
+      walletAddress: '',
+      selectedWallet: '',
+      showWalletModal: false,
+      showConfirmationModal: false,
+      activeTab: 'send',
+      isTransactionPending: false,
+      isSwapPending: false,
+      tonBalance: '0.000000',
+      aquacoinBalance: '0.000000',
+      tonPrice: 2.45,
+      aquacoinPrice: 0.12,
+      sendForm: {
+        token: 'TON',
+        recipient: '',
+        amount: '',
+        message: ''
+      },
+      swapForm: {
+        fromToken: 'TON',
+        toToken: 'AQCNX',
+        fromAmount: '',
+        toAmount: ''
+      },
+      confirmationData: {
+        amount: '',
+        token: '',
+        recipient: '',
+        gasFee: '',
+        total: ''
+      },
+      notification: {
+        show: false,
+        type: 'info',
+        message: ''
+      },
+      supportedWallets: [
+        {
+          name: 'Tonkeeper',
+          icon: 'fas fa-wallet',
+          color: 'text-blue-600',
+          description: 'Most popular TON wallet'
+        }
+      ],
+      transactionHistory: []
+    }
+  },
+  computed: {
+    totalPortfolioValue() {
+      const tonValue = parseFloat(this.tonBalance) * this.tonPrice;
+      const aquaValue = parseFloat(this.aquacoinBalance) * this.aquacoinPrice;
+      return tonValue + aquaValue;
+    },
+    estimatedGasFee() {
+      return '0.005000';
+    },
+    swapRate() {
+      if (this.swapForm.fromToken === 'TON' && this.swapForm.toToken === 'AQCNX') {
+        return (this.tonPrice / this.aquacoinPrice).toFixed(6);
+      } else if (this.swapForm.fromToken === 'AQCNX' && this.swapForm.toToken === 'TON') {
+        return (this.aquacoinPrice / this.tonPrice).toFixed(6);
+      }
+      return '1.000000';
+    }
+  },
+  watch: {
+    'swapForm.fromAmount'(newAmount) {
+      if (newAmount && !isNaN(parseFloat(newAmount))) {
+        const rate = parseFloat(this.swapRate);
+        this.swapForm.toAmount = (parseFloat(newAmount) * rate).toFixed(6);
+      } else {
+        this.swapForm.toAmount = '';
+      }
+    }
+  },
+  methods: {
+    showNotification(type, message) {
+      this.notification.type = type;
+      this.notification.message = message;
+      this.notification.show = true;
+      setTimeout(() => {
+        this.notification.show = false;
+      }, 4000);
+    },
+    truncateAddress(address) {
+      if (!address) return '';
+      return `${address.slice(0, 6)}...${address.slice(-6)}`;
+    },
+    async connectWallet(walletName) {
+      try {
+        this.showWalletModal = false;
+        this.showNotification('info', `Connecting to ${walletName}...`);
+        
+        await new Promise(resolve => setTimeout(resolve, 2000));
+        
+        this.isConnected = true;
+        this.selectedWallet = walletName;
+        this.walletAddress = 'EQD' + Math.random().toString(36).substring(2, 15) + Math.random().toString(36).substring(2, 15);
+        
+        this.tonBalance = (Math.random() * 10 + 1).toFixed(6);
+        this.aquacoinBalance = (Math.random() * 1000 + 100).toFixed(6);
+        
+        this.showNotification('success', `Connected to ${walletName} successfully!`);
+        this.activeTab = 'send';
+      } catch (error) {
+        this.showNotification('error', `Failed to connect to ${walletName}`);
+      }
+    },
+    disconnect() {
+      this.isConnected = false;
+      this.walletAddress = '';
+      this.selectedWallet = '';
+      this.tonBalance = '0.000000';
+      this.aquacoinBalance = '0.000000';
+      this.showNotification('info', 'Wallet disconnected');
+    },
+    sendTransaction() {
+      if (!this.sendForm.recipient || !this.sendForm.amount) {
+        this.showNotification('error', 'Please fill in all required fields');
+        return;
+      }
 
-nav {
-  width: 100%;
-  font-size: 12px;
-  text-align: center;
-  margin-top: 2rem;
-}
+      this.confirmationData.amount = this.sendForm.amount;
+      this.confirmationData.token = this.sendForm.token;
+      this.confirmationData.recipient = this.sendForm.recipient;
+      this.confirmationData.gasFee = this.estimatedGasFee;
+      this.confirmationData.total = (parseFloat(this.sendForm.amount) + parseFloat(this.estimatedGasFee)).toFixed(6);
+      this.showConfirmationModal = true;
+    },
+    async confirmTransaction() {
+      this.showConfirmationModal = false;
+      this.isTransactionPending = true;
+      
+      try {
+        await new Promise(resolve => setTimeout(resolve, 3000));
+        
+        if (this.sendForm.token === 'TON') {
+          this.tonBalance = (parseFloat(this.tonBalance) - parseFloat(this.sendForm.amount)).toFixed(6);
+        } else {
+          this.aquacoinBalance = (parseFloat(this.aquacoinBalance) - parseFloat(this.sendForm.amount)).toFixed(6);
+        }
+        
+        this.transactionHistory.unshift({
+          hash: '0x' + Math.random().toString(36).substring(2, 15),
+          type: 'send',
+          amount: this.sendForm.amount,
+          token: this.sendForm.token,
+          timestamp: 'Just now',
+          status: 'confirmed'
+        });
+        
+        this.showNotification('success', 'Transaction successful!');
+      } catch (error) {
+        this.showNotification('error', 'Transaction failed');
+      } finally {
+        this.isTransactionPending = false;
+        this.sendForm.amount = '';
+        this.sendForm.recipient = '';
+        this.sendForm.message = '';
+      }
+    },
+    async performSwap() {
+      if (!this.swapForm.fromAmount || isNaN(parseFloat(this.swapForm.fromAmount))) {
+        this.showNotification('error', 'Please enter a valid amount');
+        return;
+      }
 
-nav a.router-link-exact-active {
-  color: var(--color-text);
-}
-
-nav a.router-link-exact-active:hover {
-  background-color: transparent;
-}
-
-nav a {
-  display: inline-block;
-  padding: 0 1rem;
-  border-left: 1px solid var(--color-border);
-}
-
-nav a:first-of-type {
-  border: 0;
-}
-
-@media (min-width: 1024px) {
-  header {
-    display: flex;
-    place-items: center;
-    padding-right: calc(var(--section-gap) / 2);
+      this.isSwapPending = true;
+      
+      try {
+        await new Promise(resolve => setTimeout(resolve, 3000));
+        
+        if (this.swapForm.fromToken === 'TON') {
+          this.tonBalance = (parseFloat(this.tonBalance) - parseFloat(this.swapForm.fromAmount)).toFixed(6);
+          this.aquacoinBalance = (parseFloat(this.aquacoinBalance) + parseFloat(this.swapForm.toAmount)).toFixed(6);
+        } else {
+          this.aquacoinBalance = (parseFloat(this.aquacoinBalance) - parseFloat(this.swapForm.fromAmount)).toFixed(6);
+          this.tonBalance = (parseFloat(this.tonBalance) + parseFloat(this.swapForm.toAmount)).toFixed(6);
+        }
+        
+        this.transactionHistory.unshift({
+          hash: '0x' + Math.random().toString(36).substring(2, 15),
+          type: 'swap',
+          amount: `${this.swapForm.fromAmount} ${this.swapForm.fromToken} → ${this.swapForm.toAmount} ${this.swapForm.toToken}`,
+          timestamp: 'Just now',
+          status: 'confirmed'
+        });
+        
+        this.showNotification('success', 'Swap completed successfully!');
+      } catch (error) {
+        this.showNotification('error', 'Swap failed');
+      } finally {
+        this.isSwapPending = false;
+        this.swapForm.fromAmount = '';
+        this.swapForm.toAmount = '';
+      }
+    },
+    swapTokens() {
+      const temp = this.swapForm.fromToken;
+      this.swapForm.fromToken = this.swapForm.toToken;
+      this.swapForm.toToken = temp;
+      this.swapForm.fromAmount = this.swapForm.toAmount;
+      this.swapForm.toAmount = '';
+    },
+    copyAddress() {
+      navigator.clipboard.writeText(this.walletAddress);
+      this.showNotification('success', 'Address copied to clipboard!');
+    }
   }
+};
+</script> -->
 
-  .logo {
-    margin: 0 2rem 0 0;
-  }
 
-  header .wrapper {
-    display: flex;
-    place-items: flex-start;
-    flex-wrap: wrap;
-  }
-
-  nav {
-    text-align: left;
-    margin-left: -1rem;
-    font-size: 1rem;
-
-    padding: 1rem 0;
-    margin-top: 1rem;
-  }
-}
-</style> --> 
 
    <style scoped>
         .gradient-bg {
-            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            background: linear-gradient(135deg, #667eea 0%, #4407ec 100%);
         }
         .card-hover {
             transition: all 0.3s ease;
@@ -137,13 +335,13 @@ nav a:first-of-type {
                     </div>
                     <div class="flex items-center space-x-4">
                         <button v-if="!isConnected" @click="showWalletModal = true" 
-                                class="bg-white text-purple-600 px-4 py-2 rounded-lg font-medium hover:bg-gray-100 transition">
+                                class="bg-white text-blue-600 px-4 py-2 rounded-lg font-medium hover:bg-gray-100 transition">
                             <i class="fas fa-wallet mr-2"></i>Connect Wallet
                         </button>
                         <div v-else class="flex items-center space-x-3">
                             <div class="text-white text-sm">
                                 <div class="font-medium">{{ truncateAddress(walletAddress) }}</div>
-                                <div class="text-purple-200">{{ selectedWallet }}</div>
+                                <div class="text-blue-200">{{ selectedWallet }}</div>
                             </div>
                             <button @click="disconnect" 
                                     class="bg-red-500 text-white px-3 py-2 rounded-lg hover:bg-red-600 transition">
@@ -160,14 +358,14 @@ nav a:first-of-type {
             <!-- Hero Section -->
             <div v-if="!isConnected" class="text-center py-16">
                 <h1 class="text-5xl font-bold text-gray-900 mb-6">
-                    Welcome to <span class="text-purple-600">Aquacoinx</span>
+                    Welcome to <span class="text-blue-600">Aquacoinx</span>
                 </h1>
                 <p class="text-xl text-gray-600 mb-8 max-w-2xl mx-auto">
                     The next-generation DeFi platform built on TON blockchain. 
                     Swap, stake, and manage your Aquacoin tokens with ease.
                 </p>
                 <button @click="showWalletModal = true" 
-                        class="bg-purple-600 text-white px-8 py-4 rounded-xl text-lg font-medium hover:bg-purple-700 transition transform hover:scale-105">
+                        class="bg-blue-600 text-white px-8 py-4 rounded-xl text-lg font-medium hover:bg-blue-700 transition transform hover:scale-105">
                     <i class="fas fa-rocket mr-2"></i>Get Started
                 </button>
             </div>
@@ -188,7 +386,7 @@ nav a:first-of-type {
                     <div class="bg-white p-6 rounded-xl shadow-lg card-hover">
                         <div class="flex items-center justify-between mb-4">
                             <h3 class="text-lg font-semibold text-gray-800">Aquacoin Balance</h3>
-                            <i class="fas fa-water text-purple-500 text-xl"></i>
+                            <i class="fas fa-water text-blue-500 text-xl"></i>
                         </div>
                         <div class="text-3xl font-bold text-gray-900">{{ aquacoinBalance }}</div>
                         <div class="text-sm text-gray-500 mt-2">≈ ${{ (parseFloat(aquacoinBalance) * aquacoinPrice).toFixed(2) }}</div>
@@ -207,19 +405,19 @@ nav a:first-of-type {
                 <!-- Action Buttons -->
                 <div class="grid grid-cols-2 md:grid-cols-4 gap-4 mb-8">
                     <button @click="activeTab = 'send'" 
-                            :class="['p-4 rounded-xl font-medium transition', activeTab === 'send' ? 'bg-purple-600 text-white' : 'bg-white text-gray-700 hover:bg-gray-50']">
+                            :class="['p-4 rounded-xl font-medium transition', activeTab === 'send' ? 'bg-blue-600 text-white' : 'bg-white text-gray-700 hover:bg-gray-50']">
                         <i class="fas fa-paper-plane mb-2 block text-xl"></i>Send
                     </button>
                     <button @click="activeTab = 'receive'" 
-                            :class="['p-4 rounded-xl font-medium transition', activeTab === 'receive' ? 'bg-purple-600 text-white' : 'bg-white text-gray-700 hover:bg-gray-50']">
+                            :class="['p-4 rounded-xl font-medium transition', activeTab === 'receive' ? 'bg-blue-600 text-white' : 'bg-white text-gray-700 hover:bg-gray-50']">
                         <i class="fas fa-qrcode mb-2 block text-xl"></i>Receive
                     </button>
                     <button @click="activeTab = 'swap'" 
-                            :class="['p-4 rounded-xl font-medium transition', activeTab === 'swap' ? 'bg-purple-600 text-white' : 'bg-white text-gray-700 hover:bg-gray-50']">
+                            :class="['p-4 rounded-xl font-medium transition', activeTab === 'swap' ? 'bg-blue-600 text-white' : 'bg-white text-gray-700 hover:bg-gray-50']">
                         <i class="fas fa-exchange-alt mb-2 block text-xl"></i>Swap
                     </button>
                     <button @click="activeTab = 'history'" 
-                            :class="['p-4 rounded-xl font-medium transition', activeTab === 'history' ? 'bg-purple-600 text-white' : 'bg-white text-gray-700 hover:bg-gray-50']">
+                            :class="['p-4 rounded-xl font-medium transition', activeTab === 'history' ? 'bg-blue-600 text-white' : 'bg-white text-gray-700 hover:bg-gray-50']">
                         <i class="fas fa-history mb-2 block text-xl"></i>History
                     </button>
                 </div>
@@ -233,7 +431,7 @@ nav a:first-of-type {
                             <div class="space-y-4">
                                 <div>
                                     <label class="block text-sm font-medium text-gray-700 mb-2">Token</label>
-                                    <select v-model="sendForm.token" class="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent">
+                                    <select v-model="sendForm.token" class="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent">
                                         <option value="TON">TON</option>
                                         <option value="AQUA">Aquacoin</option>
                                     </select>
@@ -241,17 +439,17 @@ nav a:first-of-type {
                                 <div>
                                     <label class="block text-sm font-medium text-gray-700 mb-2">Recipient Address</label>
                                     <input v-model="sendForm.recipient" type="text" placeholder="EQD..." 
-                                           class="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent">
+                                           class="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent">
                                 </div>
                                 <div>
                                     <label class="block text-sm font-medium text-gray-700 mb-2">Amount</label>
                                     <input v-model="sendForm.amount" type="number" step="0.000001" placeholder="0.0" 
-                                           class="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent">
+                                           class="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent">
                                 </div>
                                 <div>
                                     <label class="block text-sm font-medium text-gray-700 mb-2">Message (Optional)</label>
                                     <input v-model="sendForm.message" type="text" placeholder="Enter message..." 
-                                           class="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent">
+                                           class="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent">
                                 </div>
                                 <div class="bg-gray-50 p-4 rounded-lg">
                                     <div class="flex justify-between items-center">
@@ -260,7 +458,7 @@ nav a:first-of-type {
                                     </div>
                                 </div>
                                 <button type="submit" :disabled="isTransactionPending" 
-                                        class="w-full bg-purple-600 text-white py-3 rounded-lg font-medium hover:bg-purple-700 transition disabled:opacity-50 disabled:cursor-not-allowed">
+                                        class="w-full bg-blue-600 text-white py-3 rounded-lg font-medium hover:bg-blue-700 transition disabled:opacity-50 disabled:cursor-not-allowed">
                                     <span v-if="isTransactionPending" class="flex items-center justify-center">
                                         <div class="loading-spinner mr-2"></div>
                                         Sending...
@@ -284,7 +482,7 @@ nav a:first-of-type {
                             <div class="bg-gray-100 p-3 rounded-lg mb-4">
                                 <code class="text-sm break-all">{{ walletAddress }}</code>
                             </div>
-                            <button @click="copyAddress" class="bg-purple-600 text-white px-6 py-2 rounded-lg hover:bg-purple-700 transition">
+                            <button @click="copyAddress" class="bg-blue-600 text-white px-6 py-2 rounded-lg hover:bg-blue-700 transition">
                                 <i class="fas fa-copy mr-2"></i>Copy Address
                             </button>
                         </div>
@@ -298,17 +496,17 @@ nav a:first-of-type {
                                 <div class="bg-gray-50 p-4 rounded-lg">
                                     <label class="block text-sm font-medium text-gray-700 mb-2">From</label>
                                     <div class="flex space-x-2">
-                                        <select v-model="swapForm.fromToken" class="flex-1 p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500">
+                                        <select v-model="swapForm.fromToken" class="flex-1 p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500">
                                             <option value="TON">TON</option>
                                             <option value="AQUA">Aquacoin</option>
                                         </select>
                                         <input v-model="swapForm.fromAmount" type="number" step="0.000001" placeholder="0.0" 
-                                               class="flex-2 p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500">
+                                               class="flex-2 p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500">
                                     </div>
                                 </div>
                                 
                                 <div class="text-center">
-                                    <button type="button" @click="swapTokens" class="bg-purple-100 text-purple-600 p-2 rounded-full hover:bg-purple-200 transition">
+                                    <button type="button" @click="swapTokens" class="bg-blue-100 text-blue-600 p-2 rounded-full hover:bg-blue-200 transition">
                                         <i class="fas fa-exchange-alt"></i>
                                     </button>
                                 </div>
@@ -316,7 +514,7 @@ nav a:first-of-type {
                                 <div class="bg-gray-50 p-4 rounded-lg">
                                     <label class="block text-sm font-medium text-gray-700 mb-2">To</label>
                                     <div class="flex space-x-2">
-                                        <select v-model="swapForm.toToken" class="flex-1 p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500">
+                                        <select v-model="swapForm.toToken" class="flex-1 p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500">
                                             <option value="TON">TON</option>
                                             <option value="AQUA">Aquacoin</option>
                                         </select>
@@ -337,7 +535,7 @@ nav a:first-of-type {
                                 </div>
                                 
                                 <button type="submit" :disabled="isSwapPending" 
-                                        class="w-full bg-purple-600 text-white py-3 rounded-lg font-medium hover:bg-purple-700 transition disabled:opacity-50">
+                                        class="w-full bg-blue-600 text-white py-3 rounded-lg font-medium hover:bg-blue-700 transition disabled:opacity-50">
                                     <span v-if="isSwapPending" class="flex items-center justify-center">
                                         <div class="loading-spinner mr-2"></div>
                                         Swapping...
@@ -394,7 +592,7 @@ nav a:first-of-type {
                 <div class="space-y-3">
                     <button v-for="wallet in supportedWallets" :key="wallet.name"
                             @click="connectWallet(wallet.name)" 
-                            class="wallet-button w-full flex items-center p-4 border border-gray-200 rounded-lg hover:border-purple-300 hover:bg-purple-50 transition">
+                            class="wallet-button w-full flex items-center p-4 border border-gray-200 rounded-lg hover:border-blue-300 hover:bg-blue-50 transition">
                         <i :class="wallet.icon + ' text-2xl mr-4 ' + wallet.color"></i>
                         <div class="text-left">
                             <div class="font-medium">{{ wallet.name }}</div>
@@ -436,7 +634,7 @@ nav a:first-of-type {
                             Cancel
                         </button>
                         <button @click="confirmTransaction" 
-                                class="flex-1 bg-purple-600 text-white py-2 rounded-lg hover:bg-purple-700 transition">
+                                class="flex-1 bg-blue-600 text-white py-2 rounded-lg hover:bg-blue-700 transition">
                             Confirm
                         </button>
                     </div>

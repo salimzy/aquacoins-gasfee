@@ -27,13 +27,14 @@
   </nav>
 </template>
 
+
 <script>
 export default {
   props: {
     isConnected: Boolean,
     walletAddress: String,
     selectedWallet: String
-  },
+  },  emits: ['connect', 'disconnect'] ,
   methods: {
     truncateAddress(address) {
       if (!address) return '';

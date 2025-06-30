@@ -1,6 +1,7 @@
-<style scoped>
+
+   <style scoped>
         .gradient-bg {
-            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            background: linear-gradient(135deg, #667eea 0%, #4407ec 100%);
         }
         .card-hover {
             transition: all 0.3s ease;
@@ -601,5 +602,5 @@ export default {
 .gradient-bg {
   background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
 }
-/* ... rest*/
+/* ... rest of your styles ... */
 </style>
